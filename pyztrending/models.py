@@ -1,13 +1,14 @@
-from dataclasses import dataclass
 from typing import Callable, List
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 
-@dataclass(frozen=True)
 class SupportedDocumentType:
-    type: type
-    interpreter: Callable
-    weight_scale: Callable
+
+    def __init__(self, t: type(type)):
+        self.type = t
+        self.interpreter: Callable = None
+        self.weight_scale: Callable = None
 
 
 class Window:

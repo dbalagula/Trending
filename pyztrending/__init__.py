@@ -64,12 +64,15 @@ class Trending:
 
             datetime_pointer += timedelta(seconds=self.granularity_seconds)
 
-    def add_interpreter(self, t: type, interpreter: Callable, weight_scale: Callable):
-        self.supported_types_dict[t] = SupportedDocumentType(
-            type=t,
-            interpreter=interpreter,
-            weight_scale=weight_scale,
-        )
+    def add_interpreter(self, t: type, interpreter: Callable):
+        if t not in self.supported_types_dict:
+            self.supported_types_dict[t] = SupportedDocumentType(t)
+        self.supported_types_dict[t].interpreter = interpreter
+
+    def add_weight_scale(self, t: type, weight_scale: Callable):
+        if t not in self.supported_types_dict:
+            self.supported_types_dict[t] = SupportedDocumentType(t)
+        self.supported_types_dict[t].weight_scale = weight_scale
 
     def add_historical_documents(self, objects: Iterable) -> None:
         for obj in objects:

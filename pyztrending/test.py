@@ -20,7 +20,8 @@ def my_obj_weight_scale(obj: MyObj, val: int):
 t = pyztrending.Trending(window_size_seconds=15 * 60, granularity_seconds=2 * 60, ignore_empty_windows=False)
 
 
-t.add_interpreter(MyObj, my_obj_interpreter, my_obj_weight_scale)
+t.add_interpreter(MyObj, my_obj_interpreter)
+t.add_weight_scale(MyObj, my_obj_weight_scale)
 
 t.add_historical_document(MyObj(datetime.fromtimestamp(1000000000), 5))
 t.add_historical_document(MyObj(datetime.fromtimestamp(1000000000), 5))
