@@ -1,14 +1,14 @@
 from typing import Callable, List
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import datetime, timedelta
 
 
 class SupportedDocumentType:
 
-    def __init__(self, t: type(type)):
+    def __init__(self, t: type(type), interpreter: Callable, weight_function: Callable):
         self.type = t
-        self.interpreter: Callable = None
-        self.weight_scale: Callable = None
+        self.interpreter: Callable = interpreter
+        self.weight_scale: Callable = weight_function
 
 
 class Window:

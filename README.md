@@ -108,7 +108,7 @@ def hashtag_weight_scale(tweet: Tweet, hashtag: str):
 
 trending = Trending(240, 60)
 
-trending.add_weight_scale(Tweet, hashtag_weight_scale)
+trending.add_class_support(Tweet, ..., hashtag_weight_scale)
 ```
 
 In this scenario, the weighting function for determining how much is contributed towards a trending scale is dependent
@@ -142,7 +142,7 @@ def interpret_tweet(tweet: Tweet):
 
 trending = Trending(240, 60)
 
-trending.add_interpreter(Tweet, interpret_tweet)
+trending.add_class_support(Tweet, interpret_tweet, ...)
 ```
 
 The `add_interpreter` function tells `PyZTrending` how to get the two pieces of data in needs from our data structure 
@@ -169,5 +169,5 @@ def interpret_json_tweet(tweet: Dict):
 
 trending = Trending(240, 60)
 
-trending.add_interpreter(Dict, interpret_json_tweet)
+trending.add_class_support(Dict, interpret_json_tweet, ...)
 ```
