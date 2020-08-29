@@ -25,7 +25,7 @@ class Trending:
         self.__datetime_to_window: Dict[datetime, Window] = {}
         self.__token_val_to_token: Dict[object, Token] = {}
 
-        self.__historical_data_finalized = False
+        self.__is_historical_data_finalized: bool = False
 
     def add_class_support(self, t: type, interpreter: Callable, weight_scale: Callable):
         self.__supported_types_dict[t] = SupportedDocumentType(
@@ -34,8 +34,18 @@ class Trending:
             weight_scale,
         )
 
+    def add_historical_documents(self, objects: Iterable) -> None:
+        for obj in objects:
+            self.__add_historical_document(obj)
+
+    def get_trending_and_ingest(self, objects: List) -> List:
+        trending: List = self.get_trending(objects)
+        self.__token_val_to_token = {}
+        self.add_historical_documents(objects)
+        return trending
+
     def get_trending(self, objects: List) -> List:
-        if not self.__historical_data_finalized:
+        if not self.__is_historical_data_finalized:
             self.__finalize_historical_data(
                 self.__earliest_window,
                 self.__latest_window,
@@ -77,6 +87,7 @@ class Trending:
                     token.window_to_score[current_window] = 0
 
             datetime_pointer += timedelta(seconds=self.__granularity_seconds)
+        self.__is_historical_data_finalized = True
 
     def __add_historical_document(self, obj: object) -> None:
         self.historical_data_finalized = False
@@ -84,13 +95,13 @@ class Trending:
 
         windows: List[Window] = self.__get_sorted_windows_for_datetime(document.time)
 
-        if self.earliest_window is None:
-            self.earliest_window = windows[0]
-        if self.latest_window is None:
-            self.latest_window = windows[-1]
+        if self.__earliest_window is None:
+            self.__earliest_window = windows[0]
+        if self.__latest_window is None:
+            self.__latest_window = windows[-1]
 
-        self.earliest_window = min(self.earliest_window, windows[0])
-        self.latest_window = max(self.latest_window, windows[-1])
+        self.__earliest_window = min(self.__earliest_window, windows[0])
+        self.__latest_window = max(self.__latest_window, windows[-1])
 
         for token_val in document.tokens:
 
@@ -113,7 +124,7 @@ class Trending:
             if window_start_datetime not in self.__datetime_to_window:
                 self.__datetime_to_window[window_start_datetime] = Window(
                     window_start_datetime,
-                    self.__window_size_seconds
+                    self.__window_size_seconds,
                 )
             windows.append(self.__datetime_to_window[window_start_datetime])
 
