@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Callable, List, Iterable
 
+from pyztrending.exceptions import NonNormalDistributionError
 from pyztrending.models import SupportedDocumentType, Window, Token, Document
 
 
@@ -67,7 +68,12 @@ class Trending:
             return 0
         token_scores: List[float] = list(self.__token_val_to_token[token_val].window_to_score.values())
         average_window_score: float = sum(token_scores) / len(token_scores)
-        return (score - average_window_score) / stdev(token_scores)
+        try:
+            return (score - average_window_score) / stdev(token_scores)
+        except ZeroDivisionError:
+            raise NonNormalDistributionError(
+                f"Cannot calculate z score for distribution, all values are {token_scores[0]}"
+            )
 
     def __finalize_historical_data(self,
                                    earliest_window: Window,

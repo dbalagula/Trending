@@ -15,8 +15,10 @@ class Window:
 
     def __init__(self, window_start: datetime, window_size_seconds: int):
         self.window_start: datetime = window_start
-        self.window_start_timestamp = self.window_start.timestamp()
         self.window_end: datetime = window_start + timedelta(seconds=window_size_seconds)
+
+        self.window_start_timestamp = self.window_start.timestamp()
+        self.window_end_timestamp = self.window_end.timestamp()
 
     def __eq__(self, other):
         if type(other) == Window:
@@ -28,6 +30,9 @@ class Window:
 
     def __lt__(self, other):
         return self.window_start < other.window_start
+
+    def __str__(self):
+        return f"{self.window_start_timestamp}, {self.window_end_timestamp}"
 
 
 class Token:
