@@ -1,7 +1,7 @@
 from statistics import stdev
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Callable, List, Iterable
+from typing import Optional, Dict, Callable, List, Iterable, Set
 
 from pyztrending.exceptions import NonNormalDistributionError
 from pyztrending.models import SupportedDocumentType, Window, Token, Document
@@ -12,12 +12,12 @@ class Trending:
     def __init__(self,
                  window_size_seconds: int,
                  granularity_seconds: int,
-                 ignore_empty_windows: bool = False,
+                 should_ignore_empty_windows: bool = False,
                  ):
 
         self.__window_size_seconds: int = window_size_seconds
         self.__granularity_seconds: int = granularity_seconds
-        self.__ignore_empty_windows: bool = ignore_empty_windows
+        self.__should_ignore_empty_windows: bool = should_ignore_empty_windows
 
         self.__earliest_window: Optional[Window] = None
         self.__latest_window: Optional[Window] = None
@@ -28,7 +28,7 @@ class Trending:
 
         self.__is_historical_data_finalized: bool = False
 
-    def add_class_support(self, t: type, interpreter: Callable, weight_scale: Callable):
+    def add_type_support(self, t: type, interpreter: Callable, weight_scale: Callable):
         self.__supported_types_dict[t] = SupportedDocumentType(
             t,
             interpreter,
@@ -62,6 +62,10 @@ class Trending:
             trending.append((token.val, self.__get_zscore_for(token, score)))
         return trending
 
+    @property
+    def tokens(self) -> Set[object]:
+        return set(self.__token_val_to_token.keys())
+
     def __get_zscore_for(self, token: Token, score: float):
         token_val = token.val
         if token_val not in self.__token_val_to_token:
@@ -87,7 +91,7 @@ class Trending:
             current_window = Window(datetime_pointer, self.__window_size_seconds)
 
             for token in self.__token_val_to_token.values():
-                if datetime_pointer not in self.__datetime_to_window and not self.__ignore_empty_windows:
+                if datetime_pointer not in self.__datetime_to_window and not self.__should_ignore_empty_windows:
                     token.window_to_score[current_window] = 0
                 elif datetime_pointer in self.__datetime_to_window and current_window not in token.window_to_score:
                     token.window_to_score[current_window] = 0
@@ -155,4 +159,4 @@ class Trending:
 
     def __ensure_type_supported(self, t: type):
         if t not in self.__supported_types_dict:
-            raise TypeError(f"No interpreter added for type {t}")
+            raise TypeError(f"No type support for {t}!")
