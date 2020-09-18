@@ -15,8 +15,12 @@ class Trending:
                  should_ignore_empty_windows: bool = False,
                  ):
 
-        if granularity_seconds > window_size_seconds:
-            raise ValueError("Can't have step size be greater tha window size!")
+        if not isinstance(window_size_seconds, int) or not isinstance(granularity_seconds, int):
+            raise ValueError("window_size_seconds and granularity_seconds need to be both type 'int'!")
+        elif window_size_seconds <= 0 or granularity_seconds <= 0:
+            raise ValueError("window_size_seconds and granularity_seconds need to be both a positive integer!")
+        elif granularity_seconds > window_size_seconds:
+            raise ValueError("Can't have step size be greater than window size!")
 
         self.__window_size_seconds: int = window_size_seconds
         self.__granularity_seconds: int = granularity_seconds
