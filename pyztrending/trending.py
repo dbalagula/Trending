@@ -15,6 +15,9 @@ class Trending:
                  should_ignore_empty_windows: bool = False,
                  ):
 
+        if granularity_seconds > window_size_seconds:
+            raise ValueError("Can't have step size be greater tha window size!")
+
         self.__window_size_seconds: int = window_size_seconds
         self.__granularity_seconds: int = granularity_seconds
         self.__should_ignore_empty_windows: bool = should_ignore_empty_windows
@@ -83,9 +86,8 @@ class Trending:
                                    earliest_window: Window,
                                    latest_window: Window,
                                    ) -> None:
-        datetime_timestamp = earliest_window.window_start.timestamp()
-        closest_window_start: float = datetime_timestamp - (datetime_timestamp % self.__granularity_seconds)
-        datetime_pointer: datetime = datetime.fromtimestamp(closest_window_start)
+
+        datetime_pointer: datetime = datetime.fromtimestamp(earliest_window.window_start_timestamp)
 
         while datetime_pointer < latest_window.window_start:
             current_window = Window(datetime_pointer, self.__window_size_seconds)
@@ -103,7 +105,7 @@ class Trending:
         self.historical_data_finalized = False
         document: Document = self.__get_document_from_object(obj)
 
-        windows: List[Window] = self.__get_sorted_windows_for_datetime(document.time)
+        windows: List[Window] = self.__get_chronological_windows_containing_datetime(document.time)
 
         if self.__earliest_window is None:
             self.__earliest_window = windows[0]
@@ -122,33 +124,24 @@ class Trending:
             for window in windows:
                 self.__token_val_to_token[token_val].window_to_score[window] += token_weight
 
-    def __get_sorted_windows_for_datetime(self, time: datetime) -> List[Window]:
+    def __get_chronological_windows_containing_datetime(self, time: datetime) -> List[Window]:
         timestamp: float = time.timestamp()
-        window_start_timestamps: List[float] = self.__get_window_beginnings_for_timestamp(timestamp)
-        window_starts_datetime: List[datetime] = [
-            datetime.fromtimestamp(timestamp) for timestamp in window_start_timestamps
-        ]
+        closest_window: Window = self.__get_nearest_window(timestamp)
 
-        windows: List[Window] = []
-        for window_start_datetime in window_starts_datetime:
-            if window_start_datetime not in self.__datetime_to_window:
-                self.__datetime_to_window[window_start_datetime] = Window(
-                    window_start_datetime,
+        windows: List[Window] = [closest_window]
+
+        current_window_start = closest_window.window_start_timestamp - self.__granularity_seconds
+        while self.__window_size_seconds >= abs(current_window_start - timestamp):
+            current_window_start_datetime: datetime = datetime.fromtimestamp(current_window_start)
+            if current_window_start_datetime not in self.__datetime_to_window:
+                self.__datetime_to_window[current_window_start_datetime] = Window(
+                    current_window_start_datetime,
                     self.__window_size_seconds,
                 )
-            windows.append(self.__datetime_to_window[window_start_datetime])
+            windows.append(self.__datetime_to_window[current_window_start_datetime])
+            current_window_start -= self.__granularity_seconds
 
         return windows
-
-    def __get_window_beginnings_for_timestamp(self, timestamp: float) -> List[float]:
-        window_starts: List[float] = []
-        timestamp_minus_window: float = timestamp - self.__window_size_seconds
-        to_make_divisible: float = self.__granularity_seconds - (timestamp_minus_window % self.__granularity_seconds)
-        window_start: float = timestamp_minus_window + to_make_divisible
-        while window_start <= timestamp:
-            window_starts.append(window_start)
-            window_start += self.__granularity_seconds
-        return window_starts
 
     def __get_document_from_object(self, o: object):
         o_type: type = type(o)
@@ -160,3 +153,12 @@ class Trending:
     def __ensure_type_supported(self, t: type):
         if t not in self.__supported_types_dict:
             raise TypeError(f"No type support for {t}!")
+
+    def __get_nearest_window(self, timestamp: float) -> Window:
+        window_start_timestamp: float = timestamp - (timestamp % self.__granularity_seconds)
+        window_start_datetime: datetime = datetime.fromtimestamp(window_start_timestamp)
+        return Window(window_start_datetime, self.__window_size_seconds)
+
+    @staticmethod
+    def __find_closest_divisible_number(target, divisor):
+        return target - (target % divisor)
