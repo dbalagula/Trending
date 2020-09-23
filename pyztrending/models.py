@@ -40,6 +40,7 @@ class Token:
     def __init__(self, val):
         self.val = val
         self.window_to_score: defaultdict = defaultdict(float)
+        self.empty_windows: List[Window] = []
 
     def __eq__(self, other):
         if type(other) == Token:
@@ -47,6 +48,13 @@ class Token:
 
     def __hash__(self):
         return self.val.__hash__()
+
+    def is_token_mentioned_in_window(self, window: Window) -> bool:
+        return window in self.window_to_score
+
+    def get_window_scores(self, should_ignore_empty_windows: bool) -> List[float]:
+        num_empty_windows: int = 0 if should_ignore_empty_windows else len(self.empty_windows)
+        return list(self.window_to_score.values()) + [0] * num_empty_windows
 
 
 class Document:

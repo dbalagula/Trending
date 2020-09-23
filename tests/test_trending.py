@@ -85,6 +85,63 @@ class TestPyZTrending(unittest.TestCase):
             {example_val},
         )
 
+    def test_enforce_granularity_parameter(self):
+        try:
+            Trending(
+                granularity_seconds=None,
+                window_size_seconds=TestPyZTrending.WINDOW_SIZE_SIXTY_SECONDS,
+                should_ignore_empty_windows=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+            )
+        except TypeError:
+            pass
+        else:
+            self.fail("Expected TypeError for incorrect granularity type!")
+
+        try:
+            Trending(
+                granularity_seconds=0,
+                window_size_seconds=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+                should_ignore_empty_windows=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+            )
+        except ValueError:
+            pass
+        else:
+            self.fail("Expected ValueError for when granularity is not a positive integer!")
+
+        try:
+            Trending(
+                granularity_seconds=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE + 1,
+                window_size_seconds=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+                should_ignore_empty_windows=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+            )
+        except ValueError:
+            pass
+        else:
+            self.fail("Expected ValueError for when granularity is greater than window size!")
+
+    def test_enforce_window_size_parameter(self):
+        try:
+            Trending(
+                granularity_seconds=TestPyZTrending.STEP_SIZE_FIFTEEN_SECONDS,
+                window_size_seconds=None,
+                should_ignore_empty_windows=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+            )
+        except TypeError:
+            pass
+        else:
+            self.fail("Expected TypeError for incorrect window size type!")
+
+        try:
+            Trending(
+                granularity_seconds=TestPyZTrending.STEP_SIZE_FIFTEEN_SECONDS,
+                window_size_seconds=0,
+                should_ignore_empty_windows=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+            )
+        except ValueError:
+            pass
+        else:
+            self.fail("Expected ValueError for when window size is not a positive integer!")
+
     def test_non_normal_distribution_throws_exception(self):
 
         trending = Trending(
@@ -112,7 +169,7 @@ class TestPyZTrending(unittest.TestCase):
         )
 
         try:
-            trending.get_trending([
+            t = trending.get_trending([
                 later_time_my_supported_class_object,
                 later_time_my_supported_class_object,
             ])
