@@ -1,10 +1,10 @@
 from statistics import stdev
+from datetime import datetime
 from collections import defaultdict
-from datetime import datetime, timedelta
 from typing import Optional, Dict, Callable, List, Iterable, Set
 
 from pyztrending.exceptions import NonNormalDistributionError
-from pyztrending.models import SupportedDocumentType, Window, Token, Document
+from pyztrending.models import SupportedDocumentType, Window, Token, Document, TokenStore
 
 
 class Trending:
@@ -31,8 +31,7 @@ class Trending:
 
         self.__supported_types_dict: Dict[type, SupportedDocumentType] = {}
         self.__datetime_to_window: Dict[datetime, Window] = {}
-        self.__token_val_to_token: Dict[object, Token] = {}
-        self.token_set: Set[Token] = set()
+        self.__token_store: TokenStore() = TokenStore()
 
         self.__is_historical_data_finalized: bool = False
 
@@ -49,8 +48,7 @@ class Trending:
 
     def get_trending_and_ingest(self, objects: List) -> List:
         trending: List = self.get_trending(objects)
-        self.__token_val_to_token = {}
-        self.token_set = set()
+        self.__token_store.clear()
         self.add_historical_documents(objects)
         return trending
 
@@ -66,19 +64,19 @@ class Trending:
         current_window_token_to_score: defaultdict = defaultdict(float)
         trending: List = []
         for document in [self.__get_document_from_object(obj) for obj in objects]:
-            for token_val in [t for t in document.tokens if self.__have_seen_token_value(t)]:
-                token = self.__token_val_to_token[token_val]
-                current_window_token_to_score[token] += document.supported_document_type.weight_scale(
+            for token_val in [t for t in document.tokens if self.__token_store.contains(t)]:
+                current_window_token_to_score[token_val] += document.supported_document_type.weight_scale(
                     document,
                     token_val,
                 )
-        for token, score in current_window_token_to_score.items():
-            trending.append((token.val, self.__get_zscore_for(token, score)))
+        for token_val, score in current_window_token_to_score.items():
+            token: Token = self.__token_store.get(token_val)
+            trending.append((token, self.__get_zscore_for(token, score)))
         return trending
 
     @property
     def __tokens(self) -> Set[Token]:
-        return set(self.__token_val_to_token.values())
+        return set(self.__token_store.values())
 
     def __get_zscore_for(self, token: Token, score: float):
         token_scores: List[float] = token.get_window_scores(
@@ -139,12 +137,12 @@ class Trending:
 
         for token_val in document.tokens:
 
-            if not self.__have_seen_token_value(token_val):
-                self.__token_val_to_token[token_val] = Token(token_val)
+            if not self.__token_store.contains(token_val):
+                self.__token_store.add(token_val)
 
             token_weight = document.supported_document_type.weight_scale(document, token_val)
             for window in windows:
-                self.__token_val_to_token[token_val].window_to_score[window] += token_weight
+                self.__token_store.get(token_val).window_to_score[window] += token_weight
 
     def __get_chronological_windows_containing_datetime(self, time: datetime) -> List[Window]:
         timestamp: float = time.timestamp()
@@ -183,9 +181,6 @@ class Trending:
 
     def __are_any_tokens_in_window(self, window: Window) -> bool:
         return datetime.fromtimestamp(window.window_start) not in self.__datetime_to_window
-
-    def __have_seen_token_value(self, token_val: object) -> bool:
-        return token_val in self.__token_val_to_token
 
     @staticmethod
     def __find_closest_divisible_number(target, divisor):

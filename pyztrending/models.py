@@ -63,3 +63,24 @@ class Document:
         self.time = time
         self.tokens = tokens
         self.supported_document_type = supported_document_type
+
+
+class TokenStore:
+
+    def __init__(self):
+        self.token_dict: Dict[object, Token] = {}
+
+    def values(self) -> List[object]:
+        return list(self.token_dict.keys())
+
+    def add(self, token_val: object):
+        self.token_dict[token_val] = Token(token_val)
+
+    def get(self, token_val: object) -> Token:
+        return self.token_dict[token_val]
+
+    def contains(self, token: object) -> bool:
+        return token in self.token_dict
+
+    def clear(self):
+        self.token_dict = {}
