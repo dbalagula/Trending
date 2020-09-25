@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime
 
 from pyztrending import Trending
-from pyztrending.exceptions import NonNormalDistributionError
+from pyztrending.exceptions import NonNormalDistributionError, DocumentTimeError
 
 
 class MySupportedType:
@@ -81,7 +81,7 @@ class TestPyZTrending(unittest.TestCase):
         trending.add_historical_documents([example_my_supported_class_object])
 
         self.assertEqual(
-            trending.tokens,
+            trending.__tokens,
             {example_val},
         )
 
@@ -169,7 +169,7 @@ class TestPyZTrending(unittest.TestCase):
         )
 
         try:
-            t = trending.get_trending([
+            trending.get_trending([
                 later_time_my_supported_class_object,
                 later_time_my_supported_class_object,
             ])
@@ -177,3 +177,38 @@ class TestPyZTrending(unittest.TestCase):
             pass
         else:
             self.fail("NonNormalDistributionError was not thrown when it was expected!")
+
+    def test_older_document_throws_exception(self):
+
+        trending = Trending(
+            granularity_seconds=TestPyZTrending.STEP_SIZE_FIFTEEN_SECONDS,
+            window_size_seconds=TestPyZTrending.WINDOW_SIZE_SIXTY_SECONDS,
+            should_ignore_empty_windows=TestPyZTrending.SHOULD_IGNORE_EMPTY_WINDOWS_FALSE,
+        )
+
+        trending.add_type_support(
+            MySupportedType,
+            my_supported_class_interpreter,
+            my_supported_class_weight_scale,
+        )
+
+        trending.add_historical_documents([
+            example_my_supported_class_object,
+            example_my_supported_class_object,
+        ])
+
+        arbitrary_past_time_in_seconds: int = 10000
+        past_time: datetime = datetime.fromtimestamp(datetime.now().timestamp() - arbitrary_past_time_in_seconds)
+        past_time_my_supported_class_object: MySupportedType = MySupportedType(
+            example_val,
+            past_time,
+        )
+
+        try:
+            trending.get_trending([
+                past_time_my_supported_class_object,
+            ])
+        except DocumentTimeError:
+            pass
+        else:
+            self.fail("DocumentTimeError was not thrown when it was expected!")

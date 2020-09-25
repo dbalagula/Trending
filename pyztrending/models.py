@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable, List, Dict
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -14,25 +14,33 @@ class SupportedDocumentType:
 class Window:
 
     def __init__(self, window_start: datetime, window_size_seconds: int):
-        self.window_start: datetime = window_start
-        self.window_end: datetime = window_start + timedelta(seconds=window_size_seconds)
+        self.start_datetime: datetime = window_start
+        self.end_datetime: datetime = window_start + timedelta(seconds=window_size_seconds)
 
-        self.window_start_timestamp = self.window_start.timestamp()
-        self.window_end_timestamp = self.window_end.timestamp()
+        self.start_timestamp = self.start_datetime.timestamp()
+        self.end_timestamp = self.end_datetime.timestamp()
 
     def __eq__(self, other):
         if type(other) == Window:
-            return self.window_start == other.window_start
+            return self.start_datetime == other.start_datetime
         return False
 
     def __hash__(self):
-        return int(self.window_start_timestamp)
+        return int(self.start_timestamp)
 
     def __lt__(self, other):
-        return self.window_start < other.window_start
+        return self.start_datetime < other.start_datetime
 
     def __str__(self):
-        return f"{self.window_start_timestamp}, {self.window_end_timestamp}"
+        return f"{self.start_timestamp}, {self.end_timestamp}"
+
+
+class Document:
+
+    def __init__(self, time: datetime, tokens: List, supported_document_type: SupportedDocumentType):
+        self.time = time
+        self.tokens = tokens
+        self.supported_document_type = supported_document_type
 
 
 class Token:
@@ -41,6 +49,12 @@ class Token:
         self.val = val
         self.window_to_score: defaultdict = defaultdict(float)
         self.empty_windows: List[Window] = []
+
+    def add_document_to_window(self, window: Window, document: Document):
+        self.window_to_score[window] += document.supported_document_type.weight_scale(
+            document,
+            self.val,
+        )
 
     def __eq__(self, other):
         if type(other) == Token:
@@ -56,13 +70,8 @@ class Token:
         num_empty_windows: int = 0 if should_ignore_empty_windows else len(self.empty_windows)
         return list(self.window_to_score.values()) + [0] * num_empty_windows
 
-
-class Document:
-
-    def __init__(self, time: datetime, tokens: List, supported_document_type: SupportedDocumentType):
-        self.time = time
-        self.tokens = tokens
-        self.supported_document_type = supported_document_type
+    def get_scores_by_window(self) -> Dict[Window, float]:
+        return self.window_to_score
 
 
 class TokenStore:
@@ -72,6 +81,9 @@ class TokenStore:
 
     def values(self) -> List[object]:
         return list(self.token_dict.keys())
+
+    def tokens(self) -> List[object]:
+        return list(self.token_dict.values())
 
     def add(self, token_val: object):
         self.token_dict[token_val] = Token(token_val)

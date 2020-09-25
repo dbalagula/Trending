@@ -1,9 +1,8 @@
 from statistics import stdev
-from datetime import datetime
-from collections import defaultdict
-from typing import Optional, Dict, Callable, List, Iterable, Set
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Callable, List, Iterable, Set, Tuple
 
-from pyztrending.exceptions import NonNormalDistributionError
+from pyztrending.exceptions import NonNormalDistributionError, DocumentTimeError
 from pyztrending.models import SupportedDocumentType, Window, Token, Document, TokenStore
 
 
@@ -61,24 +60,35 @@ class Trending:
                 self.__earliest_window,
                 self.__latest_window,
             )
-        current_window_token_to_score: defaultdict = defaultdict(float)
-        trending: List = []
+
+        current_token_store: TokenStore = TokenStore()
+        trending_by_window: Dict[Tuple[int, int], float] = []
+
         for document in [self.__get_document_from_object(obj) for obj in objects]:
+            if document.time < self.__latest_window.start_datetime:
+                raise DocumentTimeError("Provided document in trending data set that is older than historical data!")
+            current_window: Window = self.__get_nearest_window(document.time)
             for token_val in [t for t in document.tokens if self.__token_store.contains(t)]:
-                current_window_token_to_score[token_val] += document.supported_document_type.weight_scale(
-                    document,
-                    token_val,
-                )
-        for token_val, score in current_window_token_to_score.items():
-            token: Token = self.__token_store.get(token_val)
-            trending.append((token, self.__get_zscore_for(token, score)))
-        return trending
+                if not current_token_store.contains(token_val):
+                    Trending.__move_token(self.__token_store, current_token_store, token_val)
+                token: Token = current_token_store.get(token_val)
+                token.add_document_to_window(current_window, document)
+
+        for token in current_token_store.tokens():
+            for window, score in token.get_scores_by_window():
+                trending_by_window[(window.window_start_timestamp, window.window_end_timestamp)] = \
+                    self.__get_zscore_for(token.val, token.get_window_scores(
+                        should_ignore_empty_windows=self.__should_ignore_empty_windows,
+                    ))
+
+        return trending_by_window
 
     @property
     def __tokens(self) -> Set[Token]:
         return set(self.__token_store.values())
 
-    def __get_zscore_for(self, token: Token, score: float):
+    def __get_zscore_for(self, token_val: object, score: float):
+        token: Token = self.__token_store.get(token_val)
         token_scores: List[float] = token.get_window_scores(
             should_ignore_empty_windows=self.__should_ignore_empty_windows
         )
@@ -96,7 +106,7 @@ class Trending:
                                    ) -> None:
 
         current_window: Window = Window(
-            window_start=earliest_window.window_start,
+            window_start=earliest_window.start_datetime,
             window_size_seconds=self.__window_size_seconds,
         )
 
@@ -115,7 +125,7 @@ class Trending:
                     token.window_to_score[current_window] = 0
 
             current_window: Window = Window(
-                window_start=earliest_window.window_start + self.__granularity_seconds,
+                window_start=earliest_window.start_datetime + self.__granularity_seconds,
                 window_size_seconds=self.__window_size_seconds,
             )
 
@@ -139,27 +149,24 @@ class Trending:
 
             if not self.__token_store.contains(token_val):
                 self.__token_store.add(token_val)
-
-            token_weight = document.supported_document_type.weight_scale(document, token_val)
+            token: Token = self.__token_store.get(token_val)
             for window in windows:
-                self.__token_store.get(token_val).window_to_score[window] += token_weight
+                token.add_document_to_window(window, document)
 
     def __get_chronological_windows_containing_datetime(self, time: datetime) -> List[Window]:
-        timestamp: float = time.timestamp()
-        closest_window: Window = self.__get_nearest_window(timestamp)
+        closest_window: Window = self.__get_nearest_window(time)
 
         windows: List[Window] = [closest_window]
 
-        current_window_start = closest_window.window_start_timestamp - self.__granularity_seconds
-        while self.__window_size_seconds >= abs(current_window_start - timestamp):
-            current_window_start_datetime: datetime = datetime.fromtimestamp(current_window_start)
-            if current_window_start_datetime not in self.__datetime_to_window:
-                self.__datetime_to_window[current_window_start_datetime] = Window(
-                    current_window_start_datetime,
+        current_window_start = closest_window.start_datetime - timedelta(seconds=self.__granularity_seconds)
+        while self.__window_size_seconds >= abs((current_window_start - time).total_seconds()):
+            if current_window_start not in self.__datetime_to_window:
+                self.__datetime_to_window[current_window_start] = Window(
+                    current_window_start,
                     self.__window_size_seconds,
                 )
-            windows.append(self.__datetime_to_window[current_window_start_datetime])
-            current_window_start -= self.__granularity_seconds
+            windows.append(self.__datetime_to_window[current_window_start])
+            current_window_start -= timedelta(seconds=self.__granularity_seconds)
 
         return windows
 
@@ -174,14 +181,17 @@ class Trending:
         if t not in self.__supported_types_dict:
             raise TypeError(f"No type support for {t}!")
 
-    def __get_nearest_window(self, timestamp: float) -> Window:
+    def __get_nearest_window(self, time: datetime) -> Window:
+        timestamp = time.timestamp()
         window_start_timestamp: float = timestamp - (timestamp % self.__granularity_seconds)
         window_start_datetime: datetime = datetime.fromtimestamp(window_start_timestamp)
         return Window(window_start_datetime, self.__window_size_seconds)
 
     def __are_any_tokens_in_window(self, window: Window) -> bool:
-        return datetime.fromtimestamp(window.window_start) not in self.__datetime_to_window
+        return datetime.fromtimestamp(window.start_datetime) not in self.__datetime_to_window
 
     @staticmethod
-    def __find_closest_divisible_number(target, divisor):
-        return target - (target % divisor)
+    def __move_token(from_token_store: TokenStore, to_token_store: TokenStore, token_val: object):
+        if to_token_store.contains(token_val):
+            raise ValueError("Trying to move token to TokenStore that already contains it!")
+        to_token_store.token_dict[token_val] = from_token_store.token_dict[token_val]
