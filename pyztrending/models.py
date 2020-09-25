@@ -1,6 +1,6 @@
+from datetime import datetime
 from typing import Callable, List, Dict
 from collections import defaultdict
-from datetime import datetime, timedelta
 
 
 class SupportedDocumentType:
@@ -13,23 +13,20 @@ class SupportedDocumentType:
 
 class Window:
 
-    def __init__(self, window_start: datetime, window_size_seconds: int):
-        self.start_datetime: datetime = window_start
-        self.end_datetime: datetime = window_start + timedelta(seconds=window_size_seconds)
-
-        self.start_timestamp = self.start_datetime.timestamp()
-        self.end_timestamp = self.end_datetime.timestamp()
+    def __init__(self, start_timestamp: int, window_size_seconds: int):
+        self.start_timestamp = start_timestamp
+        self.end_timestamp = start_timestamp + window_size_seconds
 
     def __eq__(self, other):
         if type(other) == Window:
-            return self.start_datetime == other.start_datetime
+            return self.start_timestamp == other.start_timestamp
         return False
 
     def __hash__(self):
         return int(self.start_timestamp)
 
     def __lt__(self, other):
-        return self.start_datetime < other.start_datetime
+        return self.start_timestamp < other.start_timestamp
 
     def __str__(self):
         return f"{self.start_timestamp}, {self.end_timestamp}"
@@ -38,7 +35,7 @@ class Window:
 class Document:
 
     def __init__(self, time: datetime, tokens: List, supported_document_type: SupportedDocumentType):
-        self.time = time
+        self.timestamp = time.timestamp()
         self.tokens = tokens
         self.supported_document_type = supported_document_type
 

@@ -1,5 +1,4 @@
 from statistics import stdev
-from datetime import datetime, timedelta
 from typing import Optional, Dict, Callable, List, Iterable, Set, Tuple
 
 from pyztrending.exceptions import NonNormalDistributionError, DocumentTimeError
@@ -29,7 +28,7 @@ class Trending:
         self.__latest_window: Optional[Window] = None
 
         self.__supported_types_dict: Dict[type, SupportedDocumentType] = {}
-        self.__datetime_to_window: Dict[datetime, Window] = {}
+        self.__timestamp_to_window: Dict[int, Window] = {}
         self.__token_store: TokenStore() = TokenStore()
 
         self.__is_historical_data_finalized: bool = False
@@ -65,9 +64,9 @@ class Trending:
         trending_by_window: Dict[Tuple[int, int], float] = []
 
         for document in [self.__get_document_from_object(obj) for obj in objects]:
-            if document.time < self.__latest_window.start_datetime:
+            if document.timestamp < self.__latest_window.start_timestamp:
                 raise DocumentTimeError("Provided document in trending data set that is older than historical data!")
-            current_window: Window = self.__get_nearest_window(document.time)
+            current_window: Window = self.__get_nearest_window(document.timestamp)
             for token_val in [t for t in document.tokens if self.__token_store.contains(t)]:
                 if not current_token_store.contains(token_val):
                     Trending.__move_token(self.__token_store, current_token_store, token_val)
@@ -106,7 +105,7 @@ class Trending:
                                    ) -> None:
 
         current_window: Window = Window(
-            window_start=earliest_window.start_datetime,
+            start_timestamp=earliest_window.start_timestamp,
             window_size_seconds=self.__window_size_seconds,
         )
 
@@ -125,7 +124,7 @@ class Trending:
                     token.window_to_score[current_window] = 0
 
             current_window: Window = Window(
-                window_start=earliest_window.start_datetime + self.__granularity_seconds,
+                start_timestamp=earliest_window.start_timestamp + self.__granularity_seconds,
                 window_size_seconds=self.__window_size_seconds,
             )
 
@@ -135,7 +134,7 @@ class Trending:
         self.historical_data_finalized = False
         document: Document = self.__get_document_from_object(obj)
 
-        windows: List[Window] = self.__get_chronological_windows_containing_datetime(document.time)
+        windows: List[Window] = self.__get_chronological_windows_containing_datetime(document.timestamp)
 
         if self.__earliest_window is None:
             self.__earliest_window = windows[0]
@@ -153,20 +152,20 @@ class Trending:
             for window in windows:
                 token.add_document_to_window(window, document)
 
-    def __get_chronological_windows_containing_datetime(self, time: datetime) -> List[Window]:
-        closest_window: Window = self.__get_nearest_window(time)
+    def __get_chronological_windows_containing_datetime(self, timestamp: int) -> List[Window]:
+        closest_window: Window = self.__get_nearest_window(timestamp)
 
         windows: List[Window] = [closest_window]
 
-        current_window_start = closest_window.start_datetime - timedelta(seconds=self.__granularity_seconds)
-        while self.__window_size_seconds >= abs((current_window_start - time).total_seconds()):
-            if current_window_start not in self.__datetime_to_window:
-                self.__datetime_to_window[current_window_start] = Window(
+        current_window_start = closest_window.start_timestamp - self.__granularity_seconds
+        while self.__window_size_seconds >= abs(current_window_start - timestamp):
+            if current_window_start not in self.__timestamp_to_window:
+                self.__timestamp_to_window[current_window_start] = Window(
                     current_window_start,
                     self.__window_size_seconds,
                 )
-            windows.append(self.__datetime_to_window[current_window_start])
-            current_window_start -= timedelta(seconds=self.__granularity_seconds)
+            windows.append(self.__timestamp_to_window[current_window_start])
+            current_window_start -= self.__granularity_seconds
 
         return windows
 
@@ -181,14 +180,12 @@ class Trending:
         if t not in self.__supported_types_dict:
             raise TypeError(f"No type support for {t}!")
 
-    def __get_nearest_window(self, time: datetime) -> Window:
-        timestamp = time.timestamp()
+    def __get_nearest_window(self, timestamp: int) -> Window:
         window_start_timestamp: float = timestamp - (timestamp % self.__granularity_seconds)
-        window_start_datetime: datetime = datetime.fromtimestamp(window_start_timestamp)
-        return Window(window_start_datetime, self.__window_size_seconds)
+        return Window(window_start_timestamp, self.__window_size_seconds)
 
     def __are_any_tokens_in_window(self, window: Window) -> bool:
-        return datetime.fromtimestamp(window.start_datetime) not in self.__datetime_to_window
+        return window.start_timestamp not in self.__timestamp_to_window
 
     @staticmethod
     def __move_token(from_token_store: TokenStore, to_token_store: TokenStore, token_val: object):
