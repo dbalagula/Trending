@@ -81,7 +81,7 @@ class TestPyZTrending(unittest.TestCase):
         trending.add_historical_documents([example_my_supported_class_object])
 
         self.assertEqual(
-            trending.__tokens,
+            trending._tokens,
             {example_val},
         )
 

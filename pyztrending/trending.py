@@ -67,7 +67,7 @@ class Trending:
             if document.timestamp < self.__latest_window.start_timestamp:
                 raise DocumentTimeError("Provided document in trending data set that is older than historical data!")
             current_window: Window = self.__get_nearest_window(document.timestamp)
-            for token_val in [t for t in document.tokens if self.__token_store.contains(t)]:
+            for token_val in filter(lambda t: self.__token_store.contains(t), document.tokens):
                 if not current_token_store.contains(token_val):
                     Trending.__move_token(self.__token_store, current_token_store, token_val)
                 token: Token = current_token_store.get(token_val)
@@ -76,18 +76,15 @@ class Trending:
         for token in current_token_store.tokens():
             for window, score in token.get_scores_by_window():
                 trending_by_window[(window.window_start_timestamp, window.window_end_timestamp)] = \
-                    self.__get_zscore_for(token.val, token.get_window_scores(
-                        should_ignore_empty_windows=self.__should_ignore_empty_windows,
-                    ))
+                    self.__get_zscore_for(token, score)
 
         return trending_by_window
 
     @property
-    def __tokens(self) -> Set[Token]:
+    def _tokens(self) -> Set[Token]:
         return set(self.__token_store.values())
 
-    def __get_zscore_for(self, token_val: object, score: float):
-        token: Token = self.__token_store.get(token_val)
+    def __get_zscore_for(self, token: Token, score: float):
         token_scores: List[float] = token.get_window_scores(
             should_ignore_empty_windows=self.__should_ignore_empty_windows
         )
@@ -111,7 +108,7 @@ class Trending:
 
         while current_window < latest_window:
 
-            for token in self.__tokens:
+            for token in self._tokens:
 
                 is_current_window_empty: bool = not self.__are_any_tokens_in_window(current_window)
 
@@ -134,7 +131,7 @@ class Trending:
         self.historical_data_finalized = False
         document: Document = self.__get_document_from_object(obj)
 
-        windows: List[Window] = self.__get_chronological_windows_containing_datetime(document.timestamp)
+        windows: List[Window] = self.__get_chronological_windows_containing_timestamp(document.timestamp)
 
         if self.__earliest_window is None:
             self.__earliest_window = windows[0]
@@ -152,7 +149,7 @@ class Trending:
             for window in windows:
                 token.add_document_to_window(window, document)
 
-    def __get_chronological_windows_containing_datetime(self, timestamp: int) -> List[Window]:
+    def __get_chronological_windows_containing_timestamp(self, timestamp: int) -> List[Window]:
         closest_window: Window = self.__get_nearest_window(timestamp)
 
         windows: List[Window] = [closest_window]

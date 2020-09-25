@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Callable, List, Dict
 from collections import defaultdict
+from typing import Callable, List, Dict
 
 
 class SupportedDocumentType:
@@ -68,7 +68,7 @@ class Token:
         return list(self.window_to_score.values()) + [0] * num_empty_windows
 
     def get_scores_by_window(self) -> Dict[Window, float]:
-        return self.window_to_score
+        return self.window_to_score.items()
 
 
 class TokenStore:
